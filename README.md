@@ -9,7 +9,7 @@ Single-file scraper that extracts the Inc. 5000 (2025) company list from `https:
 ```bash
 uv sync
 export FIRECRAWL_API_KEY=fc-...   # get one at https://firecrawl.dev
-uv run main.py
+uv run src/parser.py
 ```
 
 Always run the scraper through `uv run`, never bare `python`. Add new dependencies with `uv add`, not by editing `pyproject.toml` by hand.
