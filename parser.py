@@ -5,7 +5,7 @@ Inc. 5000 (2025) parser — handles JS/SPA pagination by clicking through pages.
 import csv
 import time
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 URL = "https://www.inc.com/inc5000/2025"
 PAGES_TO_SCRAPE = 100  # set how many pages you want
@@ -77,8 +77,28 @@ def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         page = browser.new_page()
-        page.goto(URL, wait_until="networkidle", timeout=60_000)
-        page.wait_for_selector("table tbody tr", timeout=30_000)
+        # `networkidle` is unreliable on this Next.js/SPA site — analytics and
+        # ad beacons keep the network busy so it never goes idle. Load on a
+        # deterministic condition, then wait explicitly for the data table.
+        page.goto(URL, wait_until="domcontentloaded", timeout=60_000)
+
+        # Best-effort: dismiss a cookie/consent banner if one is covering the page.
+        page.evaluate("""() => {
+            const btn = [...document.querySelectorAll('button, a')].find(
+                el => /accept|agree|got it/i.test(el.innerText || '')
+            );
+            if (btn) btn.click();
+        }""")
+
+        try:
+            page.wait_for_selector("table tbody tr", timeout=60_000)
+        except PlaywrightTimeoutError:
+            print(
+                "Table never rendered within 60s. The site markup may have "
+                "changed or a consent overlay is blocking it. Aborting."
+            )
+            browser.close()
+            return
 
         for i in range(PAGES_TO_SCRAPE):
             for cells in extract_rows(page):
