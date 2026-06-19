@@ -14,7 +14,7 @@ uv run main.py
 
 Always run the scraper through `uv run`, never bare `python`. Add new dependencies with `uv add`, not by editing `pyproject.toml` by hand.
 
-Output is written to `inc5000_2025.csv` (see `OUTPUT`). Tune `PAGES_TO_SCRAPE` at the top of the file to limit how many pages are walked through.
+By default it scrapes the **entire** list (~5000 companies) into `inc5000_2025.csv` (see `OUTPUT`). It does this with a firecrawl **persistent browser session**: one session navigates once, bumps the pager to 50 rows/page, then walks the client-side pagination in batches (each firecrawl `execute` call has a stdout-size limit, so `PAGES_PER_CALL` caps how many pages one batch returns and the driver loops until the list ends). Rows are deduped on `rank|company`.
 
 ## Columns
 
