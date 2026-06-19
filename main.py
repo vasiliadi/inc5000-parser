@@ -1,32 +1,38 @@
 """
 Inc. 5000 (2025) parser — renders the JS/SPA via firecrawl-py and walks its
-client-side pagination inside a single browser action.
+client-side pagination, stitching the full list together across several scrape
+calls.
 
 See CLAUDE.md for why firecrawl (and not a local browser) is required: the site
 is a Next.js App Router SPA that blocks local headless browsers, the RSC payload
 is encrypted, and pagination is pure client-side DOM re-slicing with no JSON API.
 
-Why one big executeJavascript action instead of one action per page: firecrawl
-caps a scrape at 50 actions and 60s of total `wait`-action time. Driving N pages
-with a click + wait each blows past both caps. So all pagination runs *inside* a
-single async script — its internal setTimeout sleeps don't count as wait actions,
-and it's one action regardless of page count. firecrawl awaits the returned
-promise and serializes the resolved value.
+Why several calls: all paging runs inside firecrawl `executeJavascript` actions,
+and firecrawl kills a single action after ~45-50s. At 50 rows/page that caps one
+call at ~50 pages, but the full list is ~5000 companies = ~100 pages. So a driver
+makes repeated calls: each call fast-forwards past the pages already collected,
+then collects a window of new pages, until the whole list is covered. Rows are
+deduped on `rank|company`, so overlapping windows and re-reads are harmless.
+
+Each call's in-browser script is self-budgeting (stops well before firecrawl's
+kill timer) and reports how far it actually got, so the driver resumes from the
+real position even when the site is slow — it never assumes a fixed page landed.
 """
 
 import csv
-import json
+import time
 
 from firecrawl import Firecrawl
 
-# Number of pages to walk. The script bumps the pager to 50 rows/page, so each
-# page is ~50 companies (20 -> ~1000). Keep this modest: the whole walk runs
-# inside ONE firecrawl executeJavascript action, which firecrawl kills after
-# ~40-50s, so very large counts (e.g. 100) return nothing. ~50 pages is the
-# practical ceiling per call.
 URL = "https://www.inc.com/inc5000/2025"
-PAGES_TO_SCRAPE = 20
 OUTPUT = "inc5000_2025.csv"
+
+# ~100 pages * 50 rows ≈ 5000 companies (the whole list). Lower it for a partial
+# pull. WINDOW is how many pages one call collects before the driver starts the
+# next call; smaller windows survive high site latency but cost more calls.
+TOTAL_PAGES = 100
+WINDOW = 18
+OVERLAP = 2  # re-collect a couple of pages each call so boundaries can't gap
 
 HEADERS = [
     "rank",
@@ -40,37 +46,37 @@ HEADERS = [
     "state",
 ]
 
-# Single async script that walks the whole pager and returns every row.
-# `__PAGES__` is substituted with PAGES_TO_SCRAPE before sending. The DOM logic
-# (row reading, the resilient next-chevron finder, and the "wait until the first
-# rank changes" advance check) is ported straight from the old Playwright
-# scraper; dedupe runs here too so a pager that silently fails to advance can't
-# duplicate rows. firecrawl evaluates the script as an expression, so it's an
-# IIFE — and async, so internal sleeps replace Playwright's blocking waits.
-SCRAPE_ALL_JS = """(async () => {
+# One call's in-browser script. Placeholders are substituted per call:
+#   __SKIP__      pages to fast-forward past (already collected) before collecting
+#   __COLLECT__   pages to collect this call
+#   __BUDGET_MS__ stop skipping/collecting once this much wall time has elapsed,
+#                 so the action returns before firecrawl's ~45-50s kill timer
+# firecrawl evaluates the script as an expression and awaits the promise, so it's
+# an async IIFE; internal setTimeout sleeps replace Playwright's blocking waits.
+PAGE_JS = """(async () => {
+    const START = Date.now();
+    const BUDGET = __BUDGET_MS__, SKIP = __SKIP__, COLLECT = __COLLECT__;
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const PAGES = __PAGES__;
+    const inBudget = () => Date.now() - START < BUDGET;
 
     const readRows = () =>
         [...document.querySelectorAll('table tbody tr')].map(tr =>
             [...tr.querySelectorAll('td')].map(td => td.innerText.trim())
         ).filter(cells => cells.length >= 8);
-    // Cheap: read just the first row's rank cell (the advance loop polls this a
-    // lot, so avoid rebuilding the whole 50-row array each tick).
+    // Cheap: just the first row's rank cell (polled a lot while advancing).
     const firstRank = () => {
         const td = document.querySelector('table tbody tr td');
         return td ? td.innerText.trim() : null;
     };
-    // Rows hydrate after their <tr> exists, so the cells are briefly blank. Poll
-    // until the first rank is populated before trusting what we read.
+    const snapshot = () => JSON.stringify(readRows());
+
+    // Rows hydrate after their <tr> exists, so cells are briefly blank.
     const waitForData = async () => {
-        for (let i = 0; i < 40; i++) { if (firstRank()) return true; await sleep(150); }
+        for (let i = 0; i < 60; i++) { if (firstRank()) return true; await sleep(150); }
         return false;
     };
-    // React reconciles a new page cell-by-cell, so the top row can settle while
-    // lower rows still show stale/half-updated values. Wait until two consecutive
-    // reads match so we never capture a half-rendered page (e.g. duplicate ranks).
-    const snapshot = () => JSON.stringify(readRows());
+    // React reconciles a new page cell-by-cell; wait until two reads match so we
+    // never capture a half-rendered page (which would yield duplicate ranks).
     const waitStable = async () => {
         let prev = snapshot();
         for (let i = 0; i < 20; i++) {
@@ -98,9 +104,20 @@ SCRAPE_ALL_JS = """(async () => {
         if (btn && !btn.disabled) { btn.click(); return true; }
         return false;
     };
+    // Advance one page; resolves true only once the first rank actually changes.
+    const advance = async () => {
+        const before = firstRank();
+        if (!clickNext()) return false;
+        for (let i = 0; i < 80; i++) {
+            await sleep(80);
+            const fr = firstRank();
+            if (fr && fr !== before) return true;
+        }
+        return false;
+    };
 
-    await waitForData();  // first page hydrated
-    await waitStable();   // ...and fully rendered
+    if (!(await waitForData())) return { rows: [], skipped: 0, collected: 0, lastRank: null };
+    await waitStable();
 
     // Best-effort: dismiss a cookie/consent banner if one is covering the page.
     const consent = [...document.querySelectorAll('button, a')].find(
@@ -108,9 +125,8 @@ SCRAPE_ALL_JS = """(async () => {
     );
     if (consent) { consent.click(); await sleep(300); }
 
-    // Bump the rows-per-page control to 50 to cut the number of advances. It's a
-    // Radix UI Select (role="combobox"); open it and pick the "50 Rows" option.
-    // Best-effort — if the markup changes we just paginate in steps of 10.
+    // Bump the rows-per-page control to 50 (a Radix Select: open it, pick
+    // "50 Rows"). Best-effort — if it fails we just paginate in steps of 10.
     const opener = [...document.querySelectorAll('[role="combobox"], button')].find(
         el => /^\\d+\\s*Rows?$/i.test((el.innerText || '').trim())
     );
@@ -122,93 +138,125 @@ SCRAPE_ALL_JS = """(async () => {
         );
         if (opt) {
             opt.click();
-            for (let i = 0; i < 40; i++) { await sleep(150); if (readRows().length > 10) break; }
+            for (let i = 0; i < 40; i++) { await sleep(120); if (readRows().length > 10) break; }
             await waitStable();
         }
     }
 
-    const out = [], seen = new Set();
-    for (let p = 0; p < PAGES; p++) {
-        const before = firstRank();
-        for (const cells of readRows()) {
-            const key = cells[0] + '|' + cells[1];  // rank|company dedupe
-            if (!seen.has(key)) { seen.add(key); out.push(cells); }
-        }
-        if (p === PAGES - 1 || !clickNext()) break;
-        // Wait until the next page has rendered with populated cells — i.e. the
-        // first rank is non-blank AND different from the page we just read.
-        let changed = false;
-        for (let i = 0; i < 60; i++) {
-            await sleep(100);
-            const fr = firstRank();
-            if (fr && fr !== before) { changed = true; break; }
-        }
-        if (!changed) break;  // pager didn't advance — stop rather than spin
-        await waitStable();   // let the rest of the rows finish reconciling
+    // Fast-forward past pages already collected (no reads, no stability waits).
+    let skipped = 0;
+    for (let p = 0; p < SKIP && inBudget(); p++) {
+        if (!(await advance())) break;
+        skipped++;
     }
-    return { rows: out };
+
+    // Collect this window's pages.
+    const out = [];
+    let collected = 0;
+    for (let p = 0; p < COLLECT && inBudget(); p++) {
+        await waitStable();
+        for (const cells of readRows()) out.push(cells);
+        collected++;
+        if (p === COLLECT - 1) break;
+        if (!(await advance())) break;  // reached the last page
+    }
+    return { rows: out, skipped, collected, lastRank: firstRank() };
 })()"""
 
 
-def build_actions():
-    """Two actions: wait for the table to render, then run the paginating script
-    (kept well under firecrawl's 50-action / 60s-wait caps)."""
-    return [
-        {"type": "wait", "selector": "table tbody tr"},
-        {
-            "type": "executeJavascript",
-            "script": SCRAPE_ALL_JS.replace("__PAGES__", str(PAGES_TO_SCRAPE)),
-        },
-    ]
+def _client():
+    return Firecrawl()  # reads FIRECRAWL_API_KEY from the environment
 
 
-def iter_page_rows(doc):
-    """Yield the row arrays out of the executeJavascript action return.
-
-    Entries are {"type": ..., "value": <JS return>}; our script returns
-    {"rows": [...]}. Read defensively — the API may JSON-stringify the value."""
-    actions = doc.actions or {}
-    for entry in actions.get("javascriptReturns") or []:
-        value = entry.get("value", entry) if isinstance(entry, dict) else entry
-        if isinstance(value, str):  # API may JSON-stringify the return
-            value = json.loads(value)
-        if isinstance(value, dict):  # our {"rows": [...]} wrapper
-            value = value.get("rows", [])
-        if isinstance(value, list):  # skip any non-row returns
-            yield from value
-
-
-def main():
-    client = Firecrawl()  # reads FIRECRAWL_API_KEY from the environment
+def scrape_window(client, skip, collect, budget_ms=38_000):
+    """Run one scrape call that skips `skip` pages then collects `collect` pages.
+    Returns the script's result dict: {rows, skipped, collected, lastRank}."""
+    script = (
+        PAGE_JS.replace("__SKIP__", str(skip))
+        .replace("__COLLECT__", str(collect))
+        .replace("__BUDGET_MS__", str(budget_ms))
+    )
     doc = client.scrape(
         URL,
         formats=["html"],  # just to satisfy a content format; unused below
-        actions=build_actions(),
-        timeout=300_000,  # generous: the paginating script runs server-side
+        actions=[
+            {"type": "wait", "selector": "table tbody tr"},
+            {"type": "executeJavascript", "script": script},
+        ],
+        # inc.com blocks automated traffic; "auto" starts on the basic proxy and
+        # escalates to the stealth (anti-bot) proxy when a request is blocked.
+        proxy="auto",
+        timeout=300_000,
     )
+    for entry in (doc.actions or {}).get("javascriptReturns") or []:
+        value = entry.get("value") if isinstance(entry, dict) else entry
+        if isinstance(value, dict):
+            return value
+    return {}
 
-    all_rows, seen = [], set()
-    for cells in iter_page_rows(doc):
-        if len(cells) < 8:
-            continue
-        key = cells[0] + "|" + cells[1]  # rank|company dedupe (belt-and-suspenders)
-        if key not in seen:
-            seen.add(key)
-            all_rows.append(dict(zip(HEADERS, cells)))
 
-    if not all_rows:
-        # Nothing came back — surface the action result keys so the cause (e.g. a
-        # renamed result field or a consent overlay) is debuggable.
+def scrape_all(client):
+    """Drive repeated windows until the whole list is covered. Dedupe on
+    rank|company; resume each call from the page the previous one actually
+    reached (resilient to slow renders), and retry a call that comes back empty."""
+    by_key = {}
+    start = 0
+    while start < TOTAL_PAGES:
+        info, rows = {}, []
+        for attempt in range(3):  # empty render -> retry (likely throttling)
+            info = scrape_window(client, start, WINDOW)
+            rows = info.get("rows") or []
+            if rows:
+                break
+            print(f"  window start={start}: empty result, retry {attempt + 1}/2")
+            time.sleep(5 * (attempt + 1))  # back off so the proxy can rotate
+        if not rows:
+            print(f"No rows after retries at start={start}; stopping early.")
+            break
+
+        added = 0
+        for cells in rows:
+            if len(cells) < 8:
+                continue
+            key = cells[0] + "|" + cells[1]
+            if key not in by_key:
+                by_key[key] = cells
+                added += 1
+
+        skipped, collected = info.get("skipped", 0), info.get("collected", 0)
+        reached = skipped + collected  # highest page index this call walked to
         print(
-            f"No rows extracted. doc.actions keys: {list((doc.actions or {}).keys())}"
+            f"window start={start}: skipped={skipped} collected={collected} "
+            f"added={added} total={len(by_key)} lastRank={info.get('lastRank')}"
         )
+
+        # Stop if we made no forward progress (budget/latency wall) or nothing new
+        # came back (reached the end of the list).
+        if reached <= start or added == 0:
+            break
+        start = max(start + 1, reached - OVERLAP)
+
+    return list(by_key.values())
+
+
+def main():
+    client = _client()
+    rows = scrape_all(client)
+    if not rows:
+        print("No rows extracted.")
         return
 
+    # Ranks render with thousands separators ("1,000"); strip them to sort.
+    def rank_key(cells):
+        digits = cells[0].replace(",", "")
+        return int(digits) if digits.isdigit() else 1 << 30
+
+    rows.sort(key=rank_key)
     with open(OUTPUT, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=HEADERS)
-        w.writeheader()
-        w.writerows(all_rows)
-    print(f"Done: {len(all_rows)} rows -> {OUTPUT}")
+        w = csv.writer(f)
+        w.writerow(HEADERS)
+        w.writerows(rows)
+    print(f"Done: {len(rows)} rows -> {OUTPUT}")
 
 
 if __name__ == "__main__":
