@@ -24,13 +24,14 @@ would have to re-walk from page 1 every time. Rows are deduped on `rank|company`
 
 import csv
 import json
+import os
 import time
 
 from firecrawl import Firecrawl
 from firecrawl.v2.utils.error_handler import RateLimitError
 
 URL = "https://www.inc.com/inc5000/2025"
-OUTPUT = "inc5000_2025.csv"
+OUTPUT = "output/inc5000_2025.csv"
 
 # The list is ~5000 companies = ~100 pages at 50/page. One execute() call can
 # only return so much: firecrawl caps stdout near ~200KB, so each WALK call
@@ -253,6 +254,7 @@ def main():
         return int(digits) if digits.isdigit() else 1 << 30
 
     rows.sort(key=rank_key)
+    os.makedirs(os.path.dirname(OUTPUT), exist_ok=True)
     with open(OUTPUT, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(HEADERS)
