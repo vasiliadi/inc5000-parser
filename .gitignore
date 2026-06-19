@@ -217,7 +217,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Local
 .envrc
+CLAUDE.local.md
 
 # Scraper output
 inc5000_2025.csv
