@@ -174,10 +174,10 @@ def _is_rate_limit(exc):
 def _create_session(client):
     """Open a browser session, backing off through firecrawl's create rate limit
     (a few sessions per minute on smaller plans)."""
-    for attempt in range(6):
+    for _ in range(6):
         try:
             return client.v2.browser(ttl=SESSION_TTL)
-        except Exception as exc:  # noqa: BLE001 — re-raised below unless rate-limited
+        except Exception as exc:  # re-raised below unless rate-limited
             if not _is_rate_limit(exc):
                 raise
             print("  rate limited creating session; backing off…")
