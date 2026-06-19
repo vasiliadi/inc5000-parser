@@ -25,10 +25,10 @@ would have to re-walk from page 1 every time. Rows are deduped on `rank|company`
 import csv
 import json
 import os
+import sys
 import time
 
 from firecrawl import Firecrawl
-from firecrawl.v2.utils.error_handler import RateLimitError
 
 URL = "https://www.inc.com/inc5000/2025"
 OUTPUT = "output/inc5000_2025.csv"
@@ -164,13 +164,22 @@ process.stdout.write(JSON.stringify(result));
 """
 
 
+def _is_rate_limit(exc):
+    """True if `exc` looks like a firecrawl rate-limit (HTTP 429). Checked by
+    status/message rather than a concrete exception type so we don't depend on
+    firecrawl's internal exception module, which can move between releases."""
+    return getattr(exc, "status_code", None) == 429 or "rate limit" in str(exc).lower()
+
+
 def _create_session(client):
     """Open a browser session, backing off through firecrawl's create rate limit
     (a few sessions per minute on smaller plans)."""
     for attempt in range(6):
         try:
             return client.v2.browser(ttl=SESSION_TTL)
-        except RateLimitError:
+        except Exception as exc:  # noqa: BLE001 — re-raised below unless rate-limited
+            if not _is_rate_limit(exc):
+                raise
             print("  rate limited creating session; backing off…")
             time.sleep(10)
     raise RuntimeError("Could not create a browser session (rate limited).")
@@ -203,30 +212,39 @@ def _navigate(client, session_id):
     return False
 
 
-def _walk(client, session_id):
-    """Run WALK_JS in a loop, continuing from the browser's current page each
-    time, until it reports the end. Dedupe on rank|company."""
+def _walk_once(client, session_id):
+    """One WALK_JS call. Returns `(rows, reached_end, last_rank)`, or None if the
+    execute call failed (so the caller can stop)."""
     code = WALK_JS.replace("__BUDGET_MS__", str(WALK_BUDGET_MS)).replace(
         "__MAX_PAGES__", str(PAGES_PER_CALL)
     )
+    data = _exec_json(client, session_id, code)
+    if not data:
+        return None
+    rows = [cells for cells in (data.get("rows") or []) if len(cells) >= 8]
+    return rows, bool(data.get("reachedEnd")), data.get("lastRank")
+
+
+def _walk(client, session_id):
+    """Call WALK_JS in a loop, continuing from the browser's current page each
+    time, until it reports the end. Dedupe on rank|company."""
     by_key = {}
     for call in range(20):  # generous upper bound; normally ends far sooner
-        data = _exec_json(client, session_id, code)
-        if not data:
+        result = _walk_once(client, session_id)
+        if result is None:
             break
+        rows, reached_end, last_rank = result
         added = 0
-        for cells in data.get("rows") or []:
-            if len(cells) < 8:
-                continue
+        for cells in rows:
             key = cells[0] + "|" + cells[1]
             if key not in by_key:
                 by_key[key] = cells
                 added += 1
         print(
             f"walk call {call + 1}: +{added} rows (total {len(by_key)}) "
-            f"lastRank={data.get('lastRank')} reachedEnd={data.get('reachedEnd')}"
+            f"lastRank={last_rank} reachedEnd={reached_end}"
         )
-        if data.get("reachedEnd") or added == 0:
+        if reached_end or added == 0:
             break
     return list(by_key.values())
 
@@ -236,22 +254,23 @@ def main():
     session = _create_session(client)
     print(f"session {session.id}")
     try:
-        if not _navigate(client, session.id):
-            print("Page never hydrated; aborting.")
-            return
-        rows = _walk(client, session.id)
+        hydrated = _navigate(client, session.id)
+        rows = _walk(client, session.id) if hydrated else []
     finally:
         client.v2.delete_browser(session.id)
         print("session closed")
 
+    # Hard failures exit non-zero (via stderr) so automation can detect them.
+    if not hydrated:
+        sys.exit("Page never hydrated; aborting.")
     if not rows:
-        print("No rows extracted.")
-        return
+        sys.exit("No rows extracted.")
 
-    # Ranks render with thousands separators ("1,000"); strip them to sort.
+    # Ranks render with thousands separators ("1,000") and may carry decorations
+    # like "#1,000" or "1,000*"; keep only the digits so they sort numerically.
     def rank_key(cells):
-        digits = cells[0].replace(",", "")
-        return int(digits) if digits.isdigit() else 1 << 30
+        digits = "".join(ch for ch in cells[0] if ch.isdigit())
+        return int(digits) if digits else 1 << 30
 
     rows.sort(key=rank_key)
     os.makedirs(os.path.dirname(OUTPUT), exist_ok=True)
