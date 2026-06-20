@@ -59,6 +59,7 @@ HEADERS = [
 # Phase 2 (node). Navigate, wait for rows to hydrate (their <tr>s exist before
 # the cells fill), then open the rows-per-page Radix Select and pick "50 Rows".
 # `domcontentloaded` not `networkidle` — this ad-heavy site never goes idle.
+# ruff: disable[E501] — long lines below are JS string content, not Python
 NAV_JS = r"""
 await (async () => {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -92,12 +93,14 @@ const set = await page.evaluate(async () => {
 process.stdout.write(JSON.stringify({ firstRank, set }));
 })();
 """
+# ruff: enable[E501]
 
 # Phase 3 (node). The whole walk runs inside one page.evaluate so all the DOM
 # reads, stability checks, and "next" clicks happen in-page with no round-trips.
 # It honours an in-browser time budget and reports whether it reached the end, so
 # the driver can call it again to continue from the browser's current page.
 # Placeholders __BUDGET_MS__ / __MAX_PAGES__ are substituted per call.
+# ruff: disable[E501] — long lines below are JS string content, not Python
 WALK_JS = r"""
 await (async () => {
 const result = await page.evaluate(async ({ budgetMs, maxPages }) => {
@@ -162,6 +165,7 @@ const result = await page.evaluate(async ({ budgetMs, maxPages }) => {
 process.stdout.write(JSON.stringify(result));
 })();
 """
+# ruff: enable[E501]
 
 
 def _is_rate_limit(exc):
@@ -174,10 +178,10 @@ def _is_rate_limit(exc):
 def _create_session(client):
     """Open a browser session, backing off through firecrawl's create rate limit
     (a few sessions per minute on smaller plans)."""
-    for attempt in range(6):
+    for _ in range(6):
         try:
             return client.v2.browser(ttl=SESSION_TTL)
-        except Exception as exc:  # noqa: BLE001 — re-raised below unless rate-limited
+        except Exception as exc:  # re-raised below unless rate-limited
             if not _is_rate_limit(exc):
                 raise
             print("  rate limited creating session; backing off…")
