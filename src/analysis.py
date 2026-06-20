@@ -199,28 +199,39 @@ def _(group_by, pl, scored, top_n):
 
 @app.cell
 def _(alt, group_by, mo, scored, top_groups):
-    # Box plot of growth per group (log x — growth is extremely right-skewed,
-    # max ~37,000%). Altair draws its own whisker outliers.
+    # Box plot of growth per group. Log x — growth is extremely right-skewed
+    # (max ~37,000%), so a linear axis bunches the bulk up near the left. Altair
+    # draws its own whisker outliers; the text layer labels each group's median.
     _col = group_by.value
     _data = scored.filter(scored[_col].is_in(top_groups))
-    _chart = (
-        alt.Chart(_data)
-        .mark_boxplot(extent="min-max")
-        .encode(
-            x=alt.X(
-                "growth_3yr:Q",
-                scale=alt.Scale(type="log"),
-                title="3-year growth (%, log scale)",
-            ),
-            y=alt.Y(f"{_col}:N", sort="-x", title=_col),
-        )
-        .properties(
-            title=f"Growth distribution by {_col} (top {len(top_groups)})",
-            height=alt.Step(24),
-            width=640,
-        )
+    _base = alt.Chart(_data).encode(
+        y=alt.Y(
+            f"{_col}:N",
+            sort=alt.EncodingSortField("growth_3yr", op="median", order="descending"),
+            title=_col,
+        ),
     )
-    mo.ui.altair_chart(_chart)
+    _box = _base.mark_boxplot(extent="min-max").encode(
+        x=alt.X(
+            "growth_3yr:Q",
+            scale=alt.Scale(type="log"),
+            title="3-year growth (%, log scale)",
+        ),
+    )
+    _median_lbl = _base.mark_text(align="left", dx=4, fontSize=10).encode(
+        x=alt.X("median(growth_3yr):Q"),
+        text=alt.Text("median(growth_3yr):Q", format=",.0f"),
+    )
+    _chart = (_box + _median_lbl).properties(
+        title=f"Growth distribution by {_col} (top {len(top_groups)})",
+        height=alt.Step(24),
+        width=640,
+    )
+    # Selection disabled: we never read the chart's `.value` back into Python,
+    # and enabling it would make marimo call transformed_data() on these
+    # transform-bearing charts (boxplot aggregation / jitter), which needs the
+    # heavy vegafusion package.
+    mo.ui.altair_chart(_chart, chart_selection=False, legend_selection=False)
     return
 
 
@@ -239,35 +250,50 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
             pl.col("growth_3yr").median().alias("median"),
         )
     )
-    _count = (
-        alt.Chart(_stats)
-        .mark_bar(color="#4C78A8")
-        .encode(
-            x=alt.X("count:Q", title="Company count"),
-            y=alt.Y(f"{_col}:N", sort="-x", title=_col),
-        )
-        .properties(title="Companies", width=280, height=alt.Step(22))
+    _count_base = alt.Chart(_stats).encode(
+        x=alt.X("count:Q", title="Company count"),
+        y=alt.Y(
+            f"{_col}:N",
+            sort=alt.SortField("count", order="descending"),
+            title=_col,
+        ),
     )
+    _count = (
+        _count_base.mark_bar(color="#4C78A8")
+        + _count_base.mark_text(align="left", dx=3, fontSize=10).encode(
+            text=alt.Text("count:Q", format=",")
+        )
+    ).properties(title="Companies", width=280, height=alt.Step(22))
+
     # Fold mean/median into long form so they can share a grouped-bar encoding.
     _long = _stats.unpivot(
         index=_col, on=["mean", "median"], variable_name="stat", value_name="growth"
     )
-    _growth = (
-        alt.Chart(_long)
-        .mark_bar()
-        .encode(
-            x=alt.X("growth:Q", title="3-year growth (%)"),
-            y=alt.Y(f"{_col}:N", sort="-x", title=None),
-            yOffset="stat:N",
-            color=alt.Color("stat:N", title=None),
-        )
-        .properties(
-            title="Growth" + (" (outliers excluded)" if exclude_outliers.value else ""),
-            width=280,
-            height=alt.Step(22),
-        )
+    _growth_base = alt.Chart(_long).encode(
+        x=alt.X("growth:Q", title="3-year growth (%)"),
+        y=alt.Y(
+            f"{_col}:N",
+            sort=alt.EncodingSortField("growth", op="max", order="descending"),
+            title=None,
+        ),
+        yOffset="stat:N",
     )
-    mo.hstack([mo.ui.altair_chart(_count), mo.ui.altair_chart(_growth)])
+    _growth = (
+        _growth_base.mark_bar().encode(color=alt.Color("stat:N", title=None))
+        + _growth_base.mark_text(align="left", dx=3, fontSize=9).encode(
+            text=alt.Text("growth:Q", format=",.0f")
+        )
+    ).properties(
+        title="Growth" + (" (outliers excluded)" if exclude_outliers.value else ""),
+        width=280,
+        height=alt.Step(22),
+    )
+    mo.hstack(
+        [
+            mo.ui.altair_chart(_count, chart_selection=False, legend_selection=False),
+            mo.ui.altair_chart(_growth, chart_selection=False, legend_selection=False),
+        ]
+    )
     return
 
 
@@ -308,7 +334,11 @@ def _(alt, group_by, mo, scored, top_groups):
             width=640,
         )
     )
-    mo.ui.altair_chart(_chart)
+    # Selection disabled: we never read the chart's `.value` back into Python,
+    # and enabling it would make marimo call transformed_data() on these
+    # transform-bearing charts (boxplot aggregation / jitter), which needs the
+    # heavy vegafusion package.
+    mo.ui.altair_chart(_chart, chart_selection=False, legend_selection=False)
     return
 
 
