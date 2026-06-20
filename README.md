@@ -28,7 +28,7 @@ Revenue Range, Employee Growth, and Year Founded are paywalled — for non-subsc
 
 ```bash
 uv run marimo edit src/analysis.py   # interactive editor
-uv run marimo run  src/analysis.py   # read-only app
+uv run marimo run src/analysis.py    # read-only app
 ```
 
 It loads `output/inc5000_2025.csv`, **auto-drops empty columns** (the three paywalled fields above), and parses `3-YEAR GROWTH` (`"37,364%"`) into a number. It then flags `growth_3yr` outliers **per group** with `IsolationForest` — each company is scored relative to its own `industry` / `city` / `state` (pick the dimension from a dropdown; tune contamination and minimum group size with sliders). Outliers are kept and highlighted, not removed. Four views update reactively: a growth box plot per group, a top-groups bar chart (count + mean/median), an outlier-colored strip plot, and a sortable summary table.
