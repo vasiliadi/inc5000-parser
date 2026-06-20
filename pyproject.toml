@@ -31,11 +31,6 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# marimo passes cell outputs between cells by argument name, so cells receive
-# args named after the value they consume (e.g. `IsolationForest`, `CSV_PATH`) —
-# those names can't be lowercased without breaking marimo's wiring (N803/N806).
-# A cell's last bare expression (e.g. a UI element) is also how marimo decides
-# what to display, which reads as a "useless expression" to bugbear (B018).
 "src/analysis.py" = ["N803", "N806", "B018"]
 
 [tool.ty.environment]

@@ -22,7 +22,7 @@ See AGENTS.md for project conventions (always go through `uv`).
 import marimo
 
 __generated_with = "0.23.10"
-app = marimo.App(width="medium")
+app = marimo.App(width="medium", app_title="Inc. 5000 (2025) analyzer")
 
 
 @app.cell
@@ -229,7 +229,7 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
     _chart = (_box + _median_lbl).properties(
         title=f"Growth distribution by {_col} (top {len(top_groups)}){_excl}",
         height=alt.Step(24),
-        width=640,
+        width="container",
     )
     # Selection disabled: we never read the chart's `.value` back into Python,
     # and enabling it would make marimo call transformed_data() on these
@@ -269,7 +269,7 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
         )
     ).properties(
         title="Companies" + (" (outliers excluded)" if exclude_outliers.value else ""),
-        width=280,
+        width="container",
         height=alt.Step(22),
     )
 
@@ -293,14 +293,15 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
         )
     ).properties(
         title="Growth" + (" (outliers excluded)" if exclude_outliers.value else ""),
-        width=280,
+        width="container",
         height=alt.Step(22),
     )
     mo.hstack(
         [
             mo.ui.altair_chart(_count, chart_selection=False, legend_selection=False),
             mo.ui.altair_chart(_growth, chart_selection=False, legend_selection=False),
-        ]
+        ],
+        widths="equal",
     )
     return
 
@@ -355,7 +356,7 @@ def _(alt, exclude_outliers, group_by, mo, pl, random, scored, top_groups):
                 )
             ),
             height=alt.Step(46),
-            width=640,
+            width="container",
         )
     )
     # Brush-to-filter: drag a region on the strip plot to select companies; the
