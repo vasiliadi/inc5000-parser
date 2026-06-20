@@ -198,12 +198,14 @@ def _(group_by, pl, scored, top_n):
 
 
 @app.cell
-def _(alt, group_by, mo, scored, top_groups):
+def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
     # Box plot of growth per group. Log x — growth is extremely right-skewed
     # (max ~37,000%), so a linear axis bunches the bulk up near the left. Altair
     # draws its own whisker outliers; the text layer labels each group's median.
     _col = group_by.value
     _data = scored.filter(scored[_col].is_in(top_groups))
+    if exclude_outliers.value:
+        _data = _data.filter(~pl.col("is_outlier"))
     _base = alt.Chart(_data).encode(
         y=alt.Y(
             f"{_col}:N",
@@ -222,8 +224,9 @@ def _(alt, group_by, mo, scored, top_groups):
         x=alt.X("median(growth_3yr):Q"),
         text=alt.Text("median(growth_3yr):Q", format=",.0f"),
     )
+    _excl = " (outliers excluded)" if exclude_outliers.value else ""
     _chart = (_box + _median_lbl).properties(
-        title=f"Growth distribution by {_col} (top {len(top_groups)})",
+        title=f"Growth distribution by {_col} (top {len(top_groups)}){_excl}",
         height=alt.Step(24),
         width=640,
     )
@@ -298,11 +301,13 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
 
 
 @app.cell
-def _(alt, group_by, mo, scored, top_groups):
+def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
     # Strip plot: every company as a point, x = growth (log), y = group, colored
     # by inlier/outlier. A random y-offset jitter spreads overlapping points.
     _col = group_by.value
     _data = scored.filter(scored[_col].is_in(top_groups))
+    if exclude_outliers.value:
+        _data = _data.filter(~pl.col("is_outlier"))
     _chart = (
         alt.Chart(_data)
         .mark_circle(opacity=0.55)
@@ -329,7 +334,14 @@ def _(alt, group_by, mo, scored, top_groups):
         )
         .transform_calculate(jitter="random()")
         .properties(
-            title=f"Per-company growth by {_col} — red = outlier",
+            title=(
+                f"Per-company growth by {_col}"
+                + (
+                    " (outliers excluded)"
+                    if exclude_outliers.value
+                    else " — red = outlier"
+                )
+            ),
             height=alt.Step(46),
             width=640,
         )
