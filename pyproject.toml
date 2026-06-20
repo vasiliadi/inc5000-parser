@@ -10,6 +10,7 @@ dependencies = [
 
 [tool.ruff]
 target-version = "py312"
+line-length = 88
 
 [tool.ruff.lint]
 select = [
@@ -24,7 +25,6 @@ select = [
     "PIE",  # flake8-pie
     "RUF",  # ruff-specific (incl. RUF100 unused-noqa)
 ]
-ignore = ["E501"]
 
 [tool.ty.environment]
 python-version = "3.12"
