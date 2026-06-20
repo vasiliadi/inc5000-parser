@@ -27,6 +27,7 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
+    import random
     from pathlib import Path
 
     import altair as alt
@@ -37,7 +38,7 @@ def _():
     # The strip plot can plot a few thousand points; lift Altair's 5k-row guard.
     alt.data_transformers.disable_max_rows()
 
-    return IsolationForest, Path, alt, mo, pl
+    return IsolationForest, Path, alt, mo, pl, random
 
 
 @app.cell
@@ -266,7 +267,11 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
         + _count_base.mark_text(align="left", dx=3, fontSize=10).encode(
             text=alt.Text("count:Q", format=",")
         )
-    ).properties(title="Companies", width=280, height=alt.Step(22))
+    ).properties(
+        title="Companies" + (" (outliers excluded)" if exclude_outliers.value else ""),
+        width=280,
+        height=alt.Step(22),
+    )
 
     # Fold mean/median into long form so they can share a grouped-bar encoding.
     _long = _stats.unpivot(
@@ -301,13 +306,21 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
 
 
 @app.cell
-def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
+def _(alt, exclude_outliers, group_by, mo, pl, random, scored, top_groups):
     # Strip plot: every company as a point, x = growth (log), y = group, colored
     # by inlier/outlier. A random y-offset jitter spreads overlapping points.
     _col = group_by.value
     _data = scored.filter(scored[_col].is_in(top_groups))
     if exclude_outliers.value:
         _data = _data.filter(~pl.col("is_outlier"))
+    # Precompute jitter as a real column (seeded for stability) instead of an
+    # Altair `transform_calculate(random())`: a chart with no transforms lets
+    # marimo map a brush straight back to rows. (random() is also a signal
+    # expression vegafusion can't evaluate, so it would break brush-to-filter.)
+    _rng = random.Random(0)
+    _data = _data.with_columns(
+        pl.Series("jitter", [_rng.random() for _ in range(_data.height)])
+    )
     _chart = (
         alt.Chart(_data)
         .mark_circle(opacity=0.55)
@@ -332,7 +345,6 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
             order=alt.Order("is_outlier:N"),  # draw outliers on top
             tooltip=["company:N", "growth_3yr:Q", f"{_col}:N", "is_outlier:N"],
         )
-        .transform_calculate(jitter="random()")
         .properties(
             title=(
                 f"Per-company growth by {_col}"
@@ -346,11 +358,34 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
             width=640,
         )
     )
-    # Selection disabled: we never read the chart's `.value` back into Python,
-    # and enabling it would make marimo call transformed_data() on these
-    # transform-bearing charts (boxplot aggregation / jitter), which needs the
-    # heavy vegafusion package.
-    mo.ui.altair_chart(_chart, chart_selection=False, legend_selection=False)
+    # Brush-to-filter: drag a region on the strip plot to select companies; the
+    # picked rows show up in the cell below via `strip_chart.value`. This is the
+    # one row-level chart, so it's where a brush maps cleanly back to companies.
+    strip_chart = mo.ui.altair_chart(_chart, chart_selection="interval")
+    strip_chart
+    return (strip_chart,)
+
+
+@app.cell
+def _(mo, strip_chart):
+    # Rows brushed in the strip plot above, fed back into Python.
+    _sel = strip_chart.value
+    if _sel is None or len(_sel) == 0:
+        _out = mo.md("_Drag across the strip plot above to select companies._")
+    else:
+        _cols = ["rank", "company", "growth_3yr", "industry", "city", "state"]
+        _keep = [c for c in _cols if c in _sel.columns]
+        _out = mo.vstack(
+            [
+                mo.md(f"### Brushed selection — {len(_sel):,} companies"),
+                mo.ui.table(
+                    _sel.select(_keep).sort("growth_3yr", descending=True),
+                    selection=None,
+                    pagination=True,
+                ),
+            ]
+        )
+    _out
     return
 
 
