@@ -72,16 +72,20 @@ def _(CSV_PATH, pl):
 
 @app.cell
 def _(pl, raw):
-    def _nonempty_count(col: str) -> int:
-        # Non-null AND non-blank (paywalled cells are present-but-empty strings).
-        return raw.select(
-            pl.col(col).str.strip_chars().str.len_chars().fill_null(0).gt(0).sum()
-        ).item()
+    # Count non-null, non-blank cells per column in one pass (paywalled cells
+    # are present-but-empty strings).
+    _exprs = [
+        pl.col(c).str.strip_chars().str.len_chars().fill_null(0).gt(0).sum().alias(c)
+        for c in raw.columns
+    ]
+    _nonempty = raw.select(_exprs).row(0, named=True)
 
     # Drop columns that are entirely empty rather than hard-coding the three
     # paywalled names — so this keeps working if the user ever subscribes and
-    # those columns start to fill.
-    kept_cols = [c for c in raw.columns if _nonempty_count(c) > 0]
+    # those columns start to fill. Keep growth_3yr regardless: it's the analysis
+    # key, so an all-blank growth column routes to the empty-data path below
+    # instead of a ColumnNotFoundError when the chart cells reference it.
+    kept_cols = [c for c in raw.columns if _nonempty[c] > 0 or c == "growth_3yr"]
     dropped_cols = [c for c in raw.columns if c not in kept_cols]
 
     df = raw.select(kept_cols)
@@ -100,8 +104,10 @@ def _(pl, raw):
         .cast(pl.Float64, strict=False)
     )
 
-    # Can't score rows without a growth value.
-    df = df.drop_nulls("growth_3yr")
+    # Keep only positive growth: can't score nulls, and the log-scaled charts
+    # can't render <= 0 (Inc. 5000 growth is positive anyway). Filtering once
+    # here keeps every chart and the summary table over the same population.
+    df = df.drop_nulls("growth_3yr").filter(pl.col("growth_3yr") > 0)
     return df, dropped_cols
 
 
@@ -115,9 +121,14 @@ def _(df, dropped_cols, mo):
 
 
 @app.cell
-def _(mo):
+def _(df, mo):
+    # Offer only grouping columns that survived the drop-empty step, so picking
+    # one can't reference a column that isn't in the frame.
+    _group_cols = [c for c in ("industry", "city", "state") if c in df.columns]
     group_by = mo.ui.dropdown(
-        ["industry", "city", "state"], value="industry", label="Group by"
+        _group_cols,
+        value=_group_cols[0] if _group_cols else None,
+        label="Group by",
     )
     contamination = mo.ui.slider(
         0.01, 0.20, value=0.05, step=0.01, label="Contamination", show_value=True
@@ -213,8 +224,6 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
     _data = scored.filter(scored[_col].is_in(top_groups))
     if exclude_outliers.value:
         _data = _data.filter(~pl.col("is_outlier"))
-    # Log x can't render 0/negative growth; drop those so the axis behaves.
-    _data = _data.filter(pl.col("growth_3yr") > 0)
     _base = alt.Chart(_data).encode(
         y=alt.Y(
             f"{_col}:N",
@@ -322,8 +331,6 @@ def _(alt, exclude_outliers, group_by, mo, pl, random, scored, top_groups):
     _data = scored.filter(scored[_col].is_in(top_groups))
     if exclude_outliers.value:
         _data = _data.filter(~pl.col("is_outlier"))
-    # Log x can't render 0/negative growth; drop those so the axis behaves.
-    _data = _data.filter(pl.col("growth_3yr") > 0)
     # Precompute jitter as a real column (seeded for stability) instead of an
     # Altair `transform_calculate(random())`: a chart with no transforms lets
     # marimo map a brush straight back to rows. (random() is also a signal
