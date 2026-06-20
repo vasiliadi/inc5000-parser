@@ -157,6 +157,8 @@ def _(IsolationForest, pl):
             else:
                 is_outlier = [False] * part.height
             parts.append(part.with_columns(pl.Series("is_outlier", is_outlier)))
+        if not parts:  # empty input -> group_by yields no groups
+            return data.with_columns(pl.lit(False).alias("is_outlier"))
         return pl.concat(parts)
 
     return (flag_outliers,)
@@ -172,14 +174,18 @@ def _(contamination, df, flag_outliers, group_by, min_group_size):
 
 @app.cell
 def _(group_by, mo, scored):
-    _n_out = int(scored["is_outlier"].sum())
-    mo.md(
-        f"""
-        Flagged **{_n_out:,} outliers** ({_n_out / scored.height:.1%}) across
-        **{scored[group_by.value].n_unique():,}** distinct `{group_by.value}`
-        values.
-        """
-    )
+    if scored.height == 0:
+        _summary = mo.md("**No companies with growth data.**")
+    else:
+        _n_out = int(scored["is_outlier"].sum())
+        _summary = mo.md(
+            f"""
+            Flagged **{_n_out:,} outliers** ({_n_out / scored.height:.1%}) across
+            **{scored[group_by.value].n_unique():,}** distinct `{group_by.value}`
+            values.
+            """
+        )
+    _summary
     return
 
 
@@ -207,6 +213,8 @@ def _(alt, exclude_outliers, group_by, mo, pl, scored, top_groups):
     _data = scored.filter(scored[_col].is_in(top_groups))
     if exclude_outliers.value:
         _data = _data.filter(~pl.col("is_outlier"))
+    # Log x can't render 0/negative growth; drop those so the axis behaves.
+    _data = _data.filter(pl.col("growth_3yr") > 0)
     _base = alt.Chart(_data).encode(
         y=alt.Y(
             f"{_col}:N",
@@ -314,6 +322,8 @@ def _(alt, exclude_outliers, group_by, mo, pl, random, scored, top_groups):
     _data = scored.filter(scored[_col].is_in(top_groups))
     if exclude_outliers.value:
         _data = _data.filter(~pl.col("is_outlier"))
+    # Log x can't render 0/negative growth; drop those so the axis behaves.
+    _data = _data.filter(pl.col("growth_3yr") > 0)
     # Precompute jitter as a real column (seeded for stability) instead of an
     # Altair `transform_calculate(random())`: a chart with no transforms lets
     # marimo map a brush straight back to rows. (random() is also a signal
