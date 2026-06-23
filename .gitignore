@@ -220,6 +220,7 @@ __marimo__/
 # Local
 .envrc
 CLAUDE.local.md
+.DS_Store
 
 # Scraper output
 output/
