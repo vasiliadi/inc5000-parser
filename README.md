@@ -35,7 +35,7 @@ It loads `output/inc5000_2025.csv`, **auto-drops empty columns** (the three payw
 
 ## Research
 
-`src/research.py` enriches a filtered company list by running each row's `prompt` through the [Parallel Task API](https://docs.parallel.ai/task-api/task-quickstart) (a web-research agent):
+`src/research.py` enriches a company list by running each row's `prompt` through the [Parallel Task API](https://docs.parallel.ai/task-api/task-quickstart) (a web-research agent):
 
 ```bash
 export PARALLEL_API_KEY=...        # get one at https://parallel.ai
@@ -44,6 +44,8 @@ uv run src/research.py
 uv run --env-file .env src/research.py
 ```
 
-It reads `output/q4_top_companies_p.csv` and writes `output/q4_top_companies_pr.csv` — the same rows plus an appended `result` column holding each company's researched summary (the source CSV is untouched). Each `prompt` cell is the full instruction for its row, so the script just forwards it as the task input.
+It reads `output/inc5000_2025.csv` and writes `output/inc5000_2025_pr.csv` — the same rows plus an appended `result` column holding each company's researched summary (the source CSV is untouched). Each `prompt` cell is the full instruction for its row, so the script just forwards it as the task input.
 
-Runs are issued concurrently through a thread pool, with a rate limiter that keeps run *creation* under the Parallel limit of **2000/min** (result polling is free and doesn't count). Progress is checkpointed to `output/q4_top_companies_pr.jsonl` as each row finishes, so an interrupted run **resumes** instead of repeating completed (paid) research — delete the JSONL to force a clean re-run. The cheapest `lite` processor is used by default; tune the processor, concurrency, and rate knobs at the top of the file.
+**First, prepare the input.** The scraper's `inc5000_2025.csv` has no `prompt` column, so the run won't start until you add one. **Edit/filter `inc5000_2025.csv` down to the rows you want and add a `prompt` column** with the instruction to research per row (e.g. `find the company {name} on the internet and fill what business they are doing and what problem do they solve`). This is the extension point — narrow the list to keep cost down and word the prompt to ask whatever you want. One run is billed per row.
+
+Runs are issued concurrently through a thread pool, with a rate limiter that keeps run *creation* under the Parallel limit of **2000/min** (result polling is free and doesn't count). Progress is checkpointed to `output/inc5000_2025_pr.jsonl` as each row finishes, so an interrupted run **resumes** instead of repeating completed (paid) research — delete the JSONL to force a clean re-run. The cheapest `lite` processor is used by default; tune the processor, concurrency, and rate knobs at the top of the file.
