@@ -1,9 +1,9 @@
 """
 Research the filtered Inc. 5000 companies with the Parallel Task API.
 
-Reads `output/q4_top_companies_p.csv`, runs each row's ready-made `prompt` through
+Reads `output/inc5000_2025.csv`, runs each row's ready-made `prompt` through
 a Parallel Task run (a web-research agent), and writes the answer into a new
-`result` column in `output/q4_top_companies_pr.csv` (the source CSV is untouched).
+`result` column in `output/inc5000_2025_pr.csv` (the source CSV is untouched).
 
 The Task API rate limit is 2000 POST /v1/tasks/runs per minute; only *creating* a
 run counts, GET/result polling does not. We stay well under it: a thread-safe
@@ -13,7 +13,7 @@ long-polls its result (a GET, so free), which is simpler than a two-phase
 create-all-then-poll and is fully resumable.
 
 Resumable: every finished row is appended to a JSONL checkpoint
-(`output/q4_top_companies_pr.jsonl`). A re-run reads the checkpoint and skips rows
+(`output/inc5000_2025_pr.jsonl`). A re-run reads the checkpoint and skips rows
 already done, so a crash or Ctrl-C never repeats successful (paid) research.
 """
 
@@ -27,9 +27,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from parallel import Parallel
 
-INPUT = "output/q4_top_companies_p.csv"
-OUTPUT = "output/q4_top_companies_pr.csv"
-CHECKPOINT = "output/q4_top_companies_pr.jsonl"  # resume log, one JSON object/line
+INPUT = "output/inc5000_2025.csv"
+OUTPUT = "output/inc5000_2025_pr.csv"
+CHECKPOINT = "output/inc5000_2025_pr.jsonl"  # resume log, one JSON object/line
 
 PROMPT_COL = "prompt"
 RESULT_COL = "result"

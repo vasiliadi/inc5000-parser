@@ -1,21 +1,22 @@
 # Researcher (`src/research.py`)
 
-Enriches the filtered company CSV by running each row's prompt through the
+Enriches a company CSV by running each row's prompt through the
 **[Parallel Task API](https://docs.parallel.ai/task-api/task-quickstart)** (a web-research
 agent) and writing the answer into a new `result` column. Read before changing
 `src/research.py` or retuning the concurrency/rate knobs.
 
 ## What it does
 
-Reads `output/q4_top_companies_p.csv` (columns `company,growth_3yr,industry,city,state,prompt`),
-sends each row's ready-made `prompt` to a Parallel Task run, and writes
-`output/q4_top_companies_pr.csv` = the original columns + an appended `result` column. The
-source CSV is never modified.
+Reads `output/inc5000_2025.csv`, sends each row's `prompt` to a Parallel Task run, and
+writes `output/inc5000_2025_pr.csv` = the original columns + an appended `result` column.
+The source CSV is never modified.
 
-The `prompt` column already carries the full instruction per row (e.g. *"find the company X
-on the internet and fill what business they are doing and what problem do they solve"*), so
-the run input *is* the prompt and the output schema is just `{"type": "text"}` — no extra
-prompt engineering in the script.
+The run input *is* the row's `prompt`, and the output schema is just `{"type": "text"}` — no
+extra prompt engineering in the script. Each `prompt` carries the full instruction per row
+(e.g. *"find the company X on the internet and fill what business they are doing and what
+problem do they solve"*). The raw scraper output has **no** `prompt` column, so `_load_rows`
+exits with `… has no 'prompt' column.` until the user adds one — preparing that column (and
+filtering the rows) is a manual step done before running, covered in the README.
 
 Configure with the `PARALLEL_API_KEY` environment variable (already in `.env`). In a shell
 without direnv active, load it explicitly: `uv run --env-file .env src/research.py`.
@@ -35,7 +36,7 @@ GET** that waits for it to finish). Each worker does both back-to-back.
   count. This is why create+result-per-worker is preferred over a two-phase
   create-all-then-poll: simpler, and the limiter already guarantees the constraint.
 - **Resumability:** every finished row is appended (under a lock, flushed) to a JSONL
-  checkpoint `output/q4_top_companies_pr.jsonl` as `{"i": <row index>, "result": <text>}`.
+  checkpoint `output/inc5000_2025_pr.jsonl` as `{"i": <row index>, "result": <text>}`.
   On start `_load_checkpoint` reads it and the run skips rows already done, so a crash or
   Ctrl-C never repeats a successful (paid) run. Delete the JSONL to force a clean re-run.
 - **Graceful degradation:** `_research_one` retries on rate-limit/transient errors with
@@ -56,9 +57,11 @@ GET** that waits for it to finish). Each worker does both back-to-back.
 
 ## Gotchas
 
-- **Input CSV has a BOM.** `_load_rows` opens with `encoding="utf-8-sig"` so the first
-  header isn't read as `﻿company`.
-- **The full run is paid, ~1110 runs.** The checkpoint makes interrupt/resume safe, but
-  re-running after deleting the JSONL re-pays for every row.
+- **`_load_rows` opens with `encoding="utf-8-sig"`** so a BOM-prefixed export (some tools
+  add one) doesn't turn the first header into `﻿rank`. Harmless on BOM-free files too.
+- **Every run is paid — one Parallel run per row.** Filtering `inc5000_2025.csv` down to the
+  rows you actually want before adding the `prompt` column keeps the cost (and time) in
+  check. The checkpoint makes interrupt/resume safe, but deleting the JSONL re-pays for
+  every row.
 - **Output text lives at `result.output.content`** for a text schema; `_output_text` reads
   it with a `str(output)` fallback in case the schema changes.
