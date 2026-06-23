@@ -13,8 +13,8 @@ The source CSV is never modified.
 
 The run input *is* the row's `prompt`, and the output schema is just `{"type": "text"}` — no
 extra prompt engineering in the script. Each `prompt` carries the full instruction per row
-(e.g. *"find the company X on the internet and fill what business they are doing and what
-problem do they solve"*). The raw scraper output has **no** `prompt` column, so `_load_rows`
+(e.g. *"find the company X on the internet and describe what business they are in and what
+problem they solve"*). The raw scraper output has **no** `prompt` column, so `_load_rows`
 exits with `… has no 'prompt' column.` until the user adds one — preparing that column (and
 filtering the rows) is a manual step done before running, covered in the README.
 
@@ -35,14 +35,19 @@ GET** that waits for it to finish). Each worker does both back-to-back.
   via a lock + next-allowed timestamp, so the cap holds regardless of input size or worker
   count. This is why create+result-per-worker is preferred over a two-phase
   create-all-then-poll: simpler, and the limiter already guarantees the constraint.
-- **Resumability:** every finished row is appended (under a lock, flushed) to a JSONL
-  checkpoint `output/inc5000_2025_pr.jsonl` as `{"i": <row index>, "result": <text>}`.
-  On start `_load_checkpoint` reads it and the run skips rows already done, so a crash or
-  Ctrl-C never repeats a successful (paid) run. Delete the JSONL to force a clean re-run.
-- **Graceful degradation:** `_research_one` retries on rate-limit/transient errors with
-  exponential backoff (`_is_rate_limit` checks HTTP 429 by status/message, same pattern as
-  the scraper). After `MAX_RETRIES` it returns an `"ERROR: ..."` string instead of raising,
-  so one bad row still gets checkpointed and the batch finishes.
+- **Resumability:** every finished row is appended (and flushed) to a JSONL checkpoint
+  `output/inc5000_2025_pr.jsonl` as `{"key": <sha1 of the prompt>, "result": <text>}`. Keying
+  on prompt *content* (via `_key`), not row position, is what lets you filter or reorder the
+  input between runs without mispairing or repeating done rows. The checkpoint is written
+  only on the main thread as each future resolves, so it needs no lock. `_load_checkpoint`
+  warns on a malformed non-final line and tolerates a half-written final one. Delete the
+  JSONL to force a clean re-run.
+- **Graceful degradation:** `_research_one` creates the run and polls its result as **two
+  separately-retried phases** — so a flaky poll re-reads the same `run_id` (free) instead of
+  re-creating a new, re-billed run. Both phases back off (`_is_rate_limit` checks HTTP 429 by
+  status/message, same pattern as the scraper, and earns extra wait). After `MAX_RETRIES` a
+  phase returns an `"ERROR: ..."` string instead of raising, so one bad row still gets
+  checkpointed and the batch finishes.
 
 ## Knobs (top of `src/research.py`)
 
@@ -52,7 +57,7 @@ GET** that waits for it to finish). Each worker does both back-to-back.
 - `MAX_WORKERS` — concurrent in-flight runs.
 - `RATE_PER_MIN` — `create()` ceiling; kept safely below the 2000/min hard limit.
 - `RESULT_TIMEOUT` — seconds to long-poll one run's result.
-- `MAX_RETRIES` — per-row create+result attempts before degrading to `ERROR:`.
+- `MAX_RETRIES` — attempts per phase (create, then poll) before degrading to `ERROR:`.
 - `LIMIT` — set to an int to process only the first N rows (smoke testing); `None` = all.
 
 ## Gotchas
@@ -63,5 +68,9 @@ GET** that waits for it to finish). Each worker does both back-to-back.
   rows you actually want before adding the `prompt` column keeps the cost (and time) in
   check. The checkpoint makes interrupt/resume safe, but deleting the JSONL re-pays for
   every row.
-- **Output text lives at `result.output.content`** for a text schema; `_output_text` reads
-  it with a `str(output)` fallback in case the schema changes.
+- **Output text lives at `result.output.content`** for a text schema; `_output_text` returns
+  it, falling back to `str(output)` only when content is truly absent (`None`) — an empty
+  string is a valid answer and is kept as-is.
+- **`LIMIT` truncates the output.** A capped run writes only those N rows to `OUTPUT`,
+  overwriting any previous full file (the script prints a `LIMIT=…` warning). Use it for
+  smoke tests, then clear `LIMIT` for the real run.
