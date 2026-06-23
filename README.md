@@ -32,3 +32,18 @@ uv run marimo run src/analysis.py    # read-only app
 ```
 
 It loads `output/inc5000_2025.csv`, **auto-drops empty columns** (the three paywalled fields above), and parses `3-YEAR GROWTH` (`"37,364%"`) into a number. It then flags `growth_3yr` outliers **per group** with `IsolationForest` — each company is scored relative to its own `industry` / `city` / `state` (pick the dimension from a dropdown; tune contamination and minimum group size with sliders). Outliers are kept and highlighted, not removed. Four views update reactively: a growth box plot per group, a top-groups bar chart (count + mean/median), an outlier-colored strip plot, and a sortable summary table.
+
+## Research
+
+`src/research.py` enriches a filtered company list by running each row's `prompt` through the [Parallel Task API](https://docs.parallel.ai/task-api/task-quickstart) (a web-research agent):
+
+```bash
+export PARALLEL_API_KEY=...        # get one at https://parallel.ai
+uv run src/research.py
+# or, if direnv isn't loading .env in your shell:
+uv run --env-file .env src/research.py
+```
+
+It reads `output/q4_top_companies_p.csv` and writes `output/q4_top_companies_pr.csv` — the same rows plus an appended `result` column holding each company's researched summary (the source CSV is untouched). Each `prompt` cell is the full instruction for its row, so the script just forwards it as the task input.
+
+Runs are issued concurrently through a thread pool, with a rate limiter that keeps run *creation* under the Parallel limit of **2000/min** (result polling is free and doesn't count). Progress is checkpointed to `output/q4_top_companies_pr.jsonl` as each row finishes, so an interrupted run **resumes** instead of repeating completed (paid) research — delete the JSONL to force a clean re-run. The cheapest `lite` processor is used by default; tune the processor, concurrency, and rate knobs at the top of the file.
