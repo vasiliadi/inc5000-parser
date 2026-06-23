@@ -1,6 +1,6 @@
 # AGENTS.md
 
-See [README.md](README.md) for the overview, setup, and run commands. This file holds the always-applicable workflow conventions; the detail needed to *modify* the scraper (`src/parser.py`) and the analyzer (`src/analysis.py`) lives in `docs/` and is linked under [Reference docs](#reference-docs) below — read those only when working in the relevant area.
+See [README.md](README.md) for the overview, setup, and run commands. This file holds the always-applicable workflow conventions; the detail needed to *modify* the scraper (`src/parser.py`), the analyzer (`src/analysis.py`), and the researcher (`src/research.py`) lives in `docs/` and is linked under [Reference docs](#reference-docs) below — read those only when working in the relevant area.
 
 ## Workflow conventions
 
@@ -28,3 +28,4 @@ Read these only when working in the relevant area — don't load them up front.
 
 - [docs/scraper.md](docs/scraper.md) — how the scraper works (firecrawl persistent session, the three phases, the `HEADERS`/dedupe/knobs) plus the firecrawl and site-specific gotchas. Read before changing `src/parser.py` or editing the in-page JS (`NAV_JS`/`WALK_JS`).
 - [docs/analyzer.md](docs/analyzer.md) — the marimo notebook's stack, cell wiring, brush-to-filter constraint, and outlier knobs. Read before changing `src/analysis.py`.
+- [docs/researcher.md](docs/researcher.md) — how the Parallel Task API enrichment works (create+result per worker, the rate limiter, JSONL checkpoint/resume, and knobs). Read before changing `src/research.py`.
