@@ -1,4 +1,4 @@
-# Scraper (`src/parser.py`)
+# Scraper (`src/scraper.py`)
 
 How the scraper works, why it's built on firecrawl, and the traps to know before editing the in-page JS (`NAV_JS`/`WALK_JS`) or chasing a breakage.
 
@@ -10,7 +10,7 @@ How the scraper works, why it's built on firecrawl, and the traps to know before
 
 ## Architecture notes
 
-The scraper drives a firecrawl **persistent browser session** (not a plain `scrape`). Configure firecrawl with the `FIRECRAWL_API_KEY` environment variable. `src/parser.py` runs three phases over a single session (`client.v2.browser()` → `browser_execute()` → `delete_browser()`):
+The scraper drives a firecrawl **persistent browser session** (not a plain `scrape`). Configure firecrawl with the `FIRECRAWL_API_KEY` environment variable. `src/scraper.py` runs three phases over a single session (`client.v2.browser()` → `browser_execute()` → `delete_browser()`):
 
 1. **Create** one browser session — it exposes a Playwright `page` global to executed code.
 2. **`NAV_JS`** — `page.goto` the list, wait for the table to hydrate, and bump the pager to 50 rows/page.
@@ -20,7 +20,7 @@ Why a session and not a plain `scrape`: a single firecrawl action is killed afte
 
 - Cell order is mapped positionally onto `HEADERS` — if Inc.'s column order changes, `HEADERS` must change to match.
 - **Dedupe** on a `rank|company` key so re-reads / boundary overlap between `WALK_JS` calls can't duplicate rows.
-- Knobs live at the top of `src/parser.py`: `PAGES_PER_CALL` (pages per `execute`, capped by stdout size), `WALK_BUDGET_MS` (per-call in-browser time budget), `SESSION_TTL`.
+- Knobs live at the top of `src/scraper.py`: `PAGES_PER_CALL` (pages per `execute`, capped by stdout size), `WALK_BUDGET_MS` (per-call in-browser time budget), `SESSION_TTL`.
 
 When the table structure or pagination breaks, the fixes live in `NAV_JS` / `WALK_JS` (the in-page DOM logic) and the driver loop.
 

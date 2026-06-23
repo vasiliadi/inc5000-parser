@@ -9,7 +9,7 @@ Single-file scraper that extracts the Inc. 5000 (2025) company list from `https:
 ```bash
 uv sync
 cp env.example .env               # then fill in your API keys (see env.example)
-uv run --env-file .env src/parser.py
+uv run --env-file .env src/scraper.py
 ```
 
 `.env` holds the API keys (`FIRECRAWL_API_KEY` for the scraper, `PARALLEL_API_KEY` for the researcher); it's gitignored. If you use [direnv](https://direnv.net/), the bundled `.envrc` auto-loads `.env` and you can drop the `--env-file .env` flag.
@@ -26,21 +26,21 @@ Revenue Range, Employee Growth, and Year Founded are paywalled — for non-subsc
 
 ## Analysis
 
-`src/analysis.py` is an interactive [marimo](https://marimo.io/) notebook for exploring the scraped CSV:
+`src/analyzer.py` is an interactive [marimo](https://marimo.io/) notebook for exploring the scraped CSV:
 
 ```bash
-uv run marimo edit src/analysis.py   # interactive editor
-uv run marimo run src/analysis.py    # read-only app
+uv run marimo edit src/analyzer.py   # interactive editor
+uv run marimo run src/analyzer.py    # read-only app
 ```
 
 It loads `output/inc5000_2025.csv`, **auto-drops empty columns** (the three paywalled fields above), and parses `3-YEAR GROWTH` (`"37,364%"`) into a number. It then flags `growth_3yr` outliers **per group** with `IsolationForest` — each company is scored relative to its own `industry` / `city` / `state` (pick the dimension from a dropdown; tune contamination and minimum group size with sliders). Outliers are kept and highlighted, not removed. Four views update reactively: a growth box plot per group, a top-groups bar chart (count + mean/median), an outlier-colored strip plot, and a sortable summary table.
 
 ## Research
 
-`src/research.py` enriches a company list by running each row's `prompt` through the [Parallel Task API](https://docs.parallel.ai/task-api/task-quickstart) (a web-research agent):
+`src/researcher.py` enriches a company list by running each row's `prompt` through the [Parallel Task API](https://docs.parallel.ai/task-api/task-quickstart) (a web-research agent):
 
 ```bash
-uv run --env-file .env src/research.py   # needs PARALLEL_API_KEY in .env (drop the flag if direnv loads it)
+uv run --env-file .env src/researcher.py   # needs PARALLEL_API_KEY in .env (drop the flag if direnv loads it)
 ```
 
 It reads `output/inc5000_2025.csv` and writes `output/inc5000_2025_pr.csv` — the same rows plus an appended `result` column holding each company's researched summary (the source CSV is untouched). Each `prompt` cell is the full instruction for its row, so the script just forwards it as the task input.

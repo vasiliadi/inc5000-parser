@@ -1,9 +1,9 @@
-# Researcher (`src/research.py`)
+# Researcher (`src/researcher.py`)
 
 Enriches a company CSV by running each row's prompt through the
 **[Parallel Task API](https://docs.parallel.ai/task-api/task-quickstart)** (a web-research
 agent) and writing the answer into a new `result` column. Read before changing
-`src/research.py` or retuning the concurrency/rate knobs.
+`src/researcher.py` or retuning the concurrency/rate knobs.
 
 ## What it does
 
@@ -19,7 +19,7 @@ exits with `… has no 'prompt' column.` until the user adds one — preparing t
 filtering the rows) is a manual step done before running, covered in the README.
 
 Configure with the `PARALLEL_API_KEY` environment variable (already in `.env`). In a shell
-without direnv active, load it explicitly: `uv run --env-file .env src/research.py`.
+without direnv active, load it explicitly: `uv run --env-file .env src/researcher.py`.
 
 ## Architecture notes
 
@@ -49,7 +49,7 @@ GET** that waits for it to finish). Each worker does both back-to-back.
   phase returns an `"ERROR: ..."` string instead of raising, so one bad row still gets
   checkpointed and the batch finishes.
 
-## Knobs (top of `src/research.py`)
+## Knobs (top of `src/researcher.py`)
 
 - `PROCESSOR` — Parallel tier; `"lite"` is the cheapest and is enough for a one-line
   summary. If the API ever rejects `"lite"` for the Task endpoint, the fallback is

@@ -1,6 +1,6 @@
 """
 Inc. 5000 (2025) analyzer — an interactive marimo notebook over the scraper's
-CSV output (`output/inc5000_2025.csv`, produced by `src/parser.py`).
+CSV output (`output/inc5000_2025.csv`, produced by `src/scraper.py`).
 
 It loads the data, drops columns that are entirely empty (the paywalled
 Revenue Range / Employee Growth / Year Founded fields come out blank for
@@ -13,8 +13,8 @@ strip plot, and a sortable summary table.
 
 Run it:
 
-    uv run marimo edit src/analysis.py     # interactive editor
-    uv run marimo run  src/analysis.py     # read-only app
+    uv run marimo edit src/analyzer.py     # interactive editor
+    uv run marimo run  src/analyzer.py     # read-only app
 
 See AGENTS.md for project conventions (always go through `uv`).
 """
@@ -55,7 +55,7 @@ def _(mo):
 
 @app.cell
 def _(Path):
-    # The scraper writes here (see `OUTPUT` in src/parser.py). Resolve relative to
+    # The scraper writes here (see `OUTPUT` in src/scraper.py). Resolve relative to
     # the repo root (this file lives in src/) so it works from any working dir.
     CSV_PATH = Path(__file__).resolve().parent.parent / "output" / "inc5000_2025.csv"
     return (CSV_PATH,)

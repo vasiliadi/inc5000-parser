@@ -1,5 +1,5 @@
 """
-Inc. 5000 (2025) parser — scrapes the full list into a CSV using a firecrawl
+Inc. 5000 (2025) scraper — scrapes the full list into a CSV using a firecrawl
 persistent browser session.
 
 See CLAUDE.md for why firecrawl (and not a local browser) is required: the site

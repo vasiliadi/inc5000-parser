@@ -1,10 +1,10 @@
 # AGENTS.md
 
-See [README.md](README.md) for the overview, setup, and run commands. This file holds the always-applicable workflow conventions; the detail needed to *modify* the scraper (`src/parser.py`), the analyzer (`src/analysis.py`), and the researcher (`src/research.py`) lives in `docs/` and is linked under [Reference docs](#reference-docs) below — read those only when working in the relevant area.
+See [README.md](README.md) for the overview, setup, and run commands. This file holds the always-applicable workflow conventions; the detail needed to *modify* the scraper (`src/scraper.py`), the analyzer (`src/analyzer.py`), and the researcher (`src/researcher.py`) lives in `docs/` and is linked under [Reference docs](#reference-docs) below — read those only when working in the relevant area.
 
 ## Workflow conventions
 
-- **Always run Python through `uv`.** Use `uv run <script>` (e.g. `uv run src/parser.py`) instead of bare `python`. Never invoke the interpreter directly.
+- **Always run Python through `uv`.** Use `uv run <script>` (e.g. `uv run src/scraper.py`) instead of bare `python`. Never invoke the interpreter directly.
 - **Add dependencies with `uv add <package>`.** Don't hand-edit `pyproject.toml` to add or bump dependencies — let `uv` manage the manifest and `uv.lock`.
 - **Before every commit, all three of these must pass:**
 
@@ -26,6 +26,6 @@ See [README.md](README.md) for the overview, setup, and run commands. This file 
 
 Read these only when working in the relevant area — don't load them up front.
 
-- [docs/scraper.md](docs/scraper.md) — how the scraper works (firecrawl persistent session, the three phases, the `HEADERS`/dedupe/knobs) plus the firecrawl and site-specific gotchas. Read before changing `src/parser.py` or editing the in-page JS (`NAV_JS`/`WALK_JS`).
-- [docs/analyzer.md](docs/analyzer.md) — the marimo notebook's stack, cell wiring, brush-to-filter constraint, and outlier knobs. Read before changing `src/analysis.py`.
-- [docs/researcher.md](docs/researcher.md) — how the Parallel Task API enrichment works (create+result per worker, the rate limiter, JSONL checkpoint/resume, and knobs). Read before changing `src/research.py`.
+- [docs/scraper.md](docs/scraper.md) — how the scraper works (firecrawl persistent session, the three phases, the `HEADERS`/dedupe/knobs) plus the firecrawl and site-specific gotchas. Read before changing `src/scraper.py` or editing the in-page JS (`NAV_JS`/`WALK_JS`).
+- [docs/analyzer.md](docs/analyzer.md) — the marimo notebook's stack, cell wiring, brush-to-filter constraint, and outlier knobs. Read before changing `src/analyzer.py`.
+- [docs/researcher.md](docs/researcher.md) — how the Parallel Task API enrichment works (create+result per worker, the rate limiter, JSONL checkpoint/resume, and knobs). Read before changing `src/researcher.py`.
