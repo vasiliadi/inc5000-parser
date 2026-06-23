@@ -63,7 +63,7 @@ GET** that waits for it to finish). Each worker does both back-to-back.
 ## Gotchas
 
 - **`_load_rows` opens with `encoding="utf-8-sig"`** so a BOM-prefixed export (some tools
-  add one) doesn't turn the first header into `﻿rank`. Harmless on BOM-free files too.
+  add one) doesn't turn the first header into `rank`. Harmless on BOM-free files too.
 - **Every run is paid — one Parallel run per row.** Filtering `inc5000_2025.csv` down to the
   rows you actually want before adding the `prompt` column keeps the cost (and time) in
   check. The checkpoint makes interrupt/resume safe, but deleting the JSONL re-pays for
