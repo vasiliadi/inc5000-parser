@@ -8,9 +8,11 @@ Single-file scraper that extracts the Inc. 5000 (2025) company list from `https:
 
 ```bash
 uv sync
-export FIRECRAWL_API_KEY=fc-...   # get one at https://firecrawl.dev
-uv run src/parser.py
+cp env.example .env               # then fill in your API keys (see env.example)
+uv run --env-file .env src/parser.py
 ```
+
+`.env` holds the API keys (`FIRECRAWL_API_KEY` for the scraper, `PARALLEL_API_KEY` for the researcher); it's gitignored. If you use [direnv](https://direnv.net/), the bundled `.envrc` auto-loads `.env` and you can drop the `--env-file .env` flag.
 
 Always run the scraper through `uv run`, never bare `python`. Add new dependencies with `uv add`, not by editing `pyproject.toml` by hand.
 
@@ -38,10 +40,7 @@ It loads `output/inc5000_2025.csv`, **auto-drops empty columns** (the three payw
 `src/research.py` enriches a company list by running each row's `prompt` through the [Parallel Task API](https://docs.parallel.ai/task-api/task-quickstart) (a web-research agent):
 
 ```bash
-export PARALLEL_API_KEY=...        # get one at https://parallel.ai
-uv run src/research.py
-# or, if direnv isn't loading .env in your shell:
-uv run --env-file .env src/research.py
+uv run --env-file .env src/research.py   # needs PARALLEL_API_KEY in .env (drop the flag if direnv loads it)
 ```
 
 It reads `output/inc5000_2025.csv` and writes `output/inc5000_2025_pr.csv` — the same rows plus an appended `result` column holding each company's researched summary (the source CSV is untouched). Each `prompt` cell is the full instruction for its row, so the script just forwards it as the task input.
