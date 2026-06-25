@@ -12,9 +12,7 @@ cp env.example .env               # then fill in your API keys (see env.example)
 uv run --env-file .env src/scraper.py
 ```
 
-`.env` holds the API keys (`FIRECRAWL_API_KEY` for the scraper, `PARALLEL_API_KEY` for the researcher); it's gitignored. If you use [direnv](https://direnv.net/), the bundled `.envrc` auto-loads `.env` and you can drop the `--env-file .env` flag.
-
-Always run the scraper through `uv run`, never bare `python`. Add new dependencies with `uv add`, not by editing `pyproject.toml` by hand.
+If you use [direnv](https://direnv.net/), the bundled `.envrc` auto-loads `.env` and you can drop the `--env-file .env` flag.
 
 By default it scrapes the **entire** list (~5000 companies) into `inc5000_2025.csv` (see `OUTPUT`). It does this with a firecrawl **persistent browser session**: one session navigates once, bumps the pager to 50 rows/page, then walks the client-side pagination in batches (each firecrawl `execute` call has a stdout-size limit, so `PAGES_PER_CALL` caps how many pages one batch returns and the driver loops until the list ends). Rows are deduped on `rank|company`.
 
@@ -29,8 +27,8 @@ Revenue Range, Employee Growth, and Year Founded are paywalled — for non-subsc
 `src/analyzer.py` is an interactive [marimo](https://marimo.io/) notebook for exploring the scraped CSV:
 
 ```bash
-uv run marimo edit src/analyzer.py   # interactive editor
 uv run marimo run src/analyzer.py    # read-only app
+uv run marimo edit src/analyzer.py   # interactive editor
 ```
 
 It loads `output/inc5000_2025.csv`, **auto-drops empty columns** (the three paywalled fields above), and parses `3-YEAR GROWTH` (`"37,364%"`) into a number. It then flags `growth_3yr` outliers **per group** with `IsolationForest` — each company is scored relative to its own `industry` / `city` / `state` (pick the dimension from a dropdown; tune contamination and minimum group size with sliders). Outliers are kept and highlighted, not removed. Four views update reactively: a growth box plot per group, a top-groups bar chart (count + mean/median), an outlier-colored strip plot, and a sortable summary table.
