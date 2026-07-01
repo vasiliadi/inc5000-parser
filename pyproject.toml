@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "altair>=6.2.1",
+    "altair>=6.2.2",
     "firecrawl-py>=4.30.2",
     "marimo>=0.23.10",
     "parallel-web>=1.1.0",
