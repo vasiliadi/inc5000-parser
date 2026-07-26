@@ -9,12 +9,12 @@
 - **Gate every commit on these passing:**
 
   ```bash
-  uvx ruff format .
-  uvx ruff check .
-  uvx ty check .
+  uvx ruff@latest format .
+  uvx ruff@latest check .
+  uvx ty@latest check .
   ```
 
-  When the change touches `src/analyzer.py`, also run `uv run marimo check --fix src/analyzer.py`.
+  When the change touches `src/analyzer.py`, also run `uv run marimo check --strict --fix src/analyzer.py`. `--strict` is what makes warnings fail the gate; `--fix` applies the same normalization `marimo edit` writes on save.
 - **Prefix the commit subject with the area that changed** — `scraper`, `analysis`, `research`, or `config` for module changes; `docs` or `chore` when the change is cross-cutting. The description already conveys what kind of change it is, and the area is what people scan for when reviewing history.
 
   ```text
