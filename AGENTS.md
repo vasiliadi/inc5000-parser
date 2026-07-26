@@ -1,31 +1,32 @@
 # AGENTS.md
 
-See [README.md](README.md) for the overview, setup, and run commands. This file holds the always-applicable workflow conventions; the detail needed to *modify* the scraper (`src/scraper.py`), the analyzer (`src/analyzer.py`), and the researcher (`src/researcher.py`) lives in `docs/` and is linked under [Reference docs](#reference-docs) below — read those only when working in the relevant area.
+[README.md](README.md) has the overview, setup, and run commands. This file holds the conventions that apply to every change; per-module detail lives in [Reference docs](#reference-docs) below.
 
 ## Workflow conventions
 
-- **Always run Python through `uv`.** Use `uv run <script>` (e.g. `uv run src/scraper.py`) instead of bare `python`. Never invoke the interpreter directly.
-- **Add dependencies with `uv add <package>`.** Don't hand-edit `pyproject.toml` to add or bump dependencies — let `uv` manage the manifest and `uv.lock`.
-- **Before every commit, all three of these must pass:**
+- **Run Python through `uv`:** `uv run src/scraper.py`, not `python src/scraper.py`.
+- **Add and bump dependencies with `uv add <package>`** so `uv` owns `pyproject.toml` and `uv.lock` — hand-editing the manifest desyncs the lockfile.
+- **Gate every commit on these passing:**
 
   ```bash
   uvx ruff format .
   uvx ruff check .
   uvx ty check .
   ```
-  
-- **Commit messages use the scope-prefixed format.** Lead with the area of the codebase that changed, not a change type — the description already conveys what kind of change it is, and the scope is what people actually scan for when debugging or reviewing history.
+
+  When the change touches `src/analyzer.py`, also run `uv run marimo check --fix src/analyzer.py`.
+- **Prefix the commit subject with the area that changed** — `scraper`, `analysis`, `research`, or `config` for module changes; `docs` or `chore` when the change is cross-cutting. The description already conveys what kind of change it is, and the area is what people scan for when reviewing history.
 
   ```text
-  scope: description
+  area: description
 
   [optional body]
   ```
 
 ## Reference docs
 
-Read these only when working in the relevant area — don't load them up front.
+Load these on demand, when working in the matching area — not up front.
 
-- [docs/scraper.md](docs/scraper.md) — how the scraper works (firecrawl persistent session, the three phases, the `HEADERS`/dedupe/knobs) plus the firecrawl and site-specific gotchas. Read before changing `src/scraper.py` or editing the in-page JS (`NAV_JS`/`WALK_JS`).
-- [docs/analyzer.md](docs/analyzer.md) — the marimo notebook's stack, cell wiring, brush-to-filter constraint, and outlier knobs. Read before changing `src/analyzer.py`.
-- [docs/researcher.md](docs/researcher.md) — how the Parallel Task API enrichment works (create+result per worker, the rate limiter, JSONL checkpoint/resume, and knobs). Read before changing `src/researcher.py`.
+- [docs/scraper.md](docs/scraper.md) — read before changing `src/scraper.py` or the in-page JS (`NAV_JS`/`WALK_JS`): the firecrawl persistent session, the three phases, `HEADERS`/dedupe/knobs, plus firecrawl and site-specific gotchas.
+- [docs/analyzer.md](docs/analyzer.md) — read before changing `src/analyzer.py`: the marimo notebook's stack, cell wiring, brush-to-filter constraint, and outlier knobs.
+- [docs/researcher.md](docs/researcher.md) — read before changing `src/researcher.py`: Parallel Task API enrichment (create+result per worker, the rate limiter, JSONL checkpoint/resume, knobs).
