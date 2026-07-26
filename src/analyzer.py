@@ -21,7 +21,7 @@ See AGENTS.md for project conventions (always go through `uv`).
 
 import marimo
 
-__generated_with = "0.23.10"
+__generated_with = "0.23.12"
 app = marimo.App(width="medium", app_title="Inc. 5000 (2025) analyzer")
 
 
@@ -37,7 +37,6 @@ def _():
 
     # The strip plot can plot a few thousand points; lift Altair's 5k-row guard.
     alt.data_transformers.disable_max_rows()
-
     return IsolationForest, Path, alt, mo, pl, random
 
 
