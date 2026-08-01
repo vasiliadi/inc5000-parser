@@ -519,7 +519,7 @@ dependencies = [
 requires-dist = [
     { name = "altair", specifier = ">=6.2.2" },
     { name = "firecrawl-py", specifier = ">=4.32.0" },
-    { name = "marimo", specifier = ">=0.23.12" },
+    { name = "marimo", specifier = ">=0.23.15" },
     { name = "parallel-web", specifier = ">=1.1.0" },
     { name = "polars", specifier = ">=1.42.1" },
     { name = "scikit-learn", specifier = ">=1.9.0" },
@@ -656,7 +656,7 @@ wheels = [
 
 [[package]]
 name = "marimo"
-version = "0.23.12"
+version = "0.23.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click", marker = "sys_platform != 'emscripten'" },
@@ -679,9 +679,9 @@ dependencies = [
     { name = "uvicorn", marker = "sys_platform != 'emscripten'" },
     { name = "websockets", marker = "sys_platform != 'emscripten'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/55/f7/5e87c08e2f1ffca54cc19abab9b5567afaa0d4797b65dd64dd24230aad6c/marimo-0.23.12.tar.gz", hash = "sha256:62de97a3477e105fab9edd0b7245d44b9b8227bcd95db51681e3a4af7134a85a", size = 38638158, upload-time = "2026-07-01T13:48:14.325Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f9/3b/e4a1e24ad97a652d25388ac602a5c35daa62980c0e4b876caddaedce4114/marimo-0.23.15.tar.gz", hash = "sha256:3c672256b420abc2b0509f2bfaedd2ee20af5902306c943cb6632e4d33b82c88", size = 38742179, upload-time = "2026-07-23T19:21:55.696Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/bc/504780c41ff760b48208220f2e4fa76c3edfea537f97762ce56b8f0f7938/marimo-0.23.12-py3-none-any.whl", hash = "sha256:681aed921115bc0f9e3a626fdd328aecd2a6cd8f94bba2db8d59bf75d8984468", size = 39085397, upload-time = "2026-07-01T13:48:10.895Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/12/97b4295858db7bf5251880ffc77919a28a2179d80de62d91923f6933f264/marimo-0.23.15-py3-none-any.whl", hash = "sha256:3198ffa0403f4c5f3e2958e2d2c4d67d12de979d6a001385f95513ea411bb338", size = 39194981, upload-time = "2026-07-23T19:21:51.21Z" },
 ]
 
 [[package]]
