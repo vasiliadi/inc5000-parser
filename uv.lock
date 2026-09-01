@@ -185,7 +185,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -985,7 +985,7 @@ wheels = [
 
 [[package]]
 name = "parallel-web"
-version = "1.1.0"
+version = "1.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -995,9 +995,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/51/1d/fefb7d976d3ea2ae61b0d9d6d638c9f837cb9fb96532680b148f33f322a1/parallel_web-1.1.0.tar.gz", hash = "sha256:97d6dbe4aa49b8c2c93f71f818d8883bc45bee71928bd945b7f616cecaacec0d", size = 157720, upload-time = "2026-06-08T18:22:21.298Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/68/f5/5968c2db6996d9c84377576d195cafe8bfdeff7c47a83ae2a980aae4fb69/parallel_web-1.3.2.tar.gz", hash = "sha256:9b30a898718af357ca1167ea213a5c7cf09b772bb99760922aa1422258ec93c5", size = 162131, upload-time = "2026-08-27T22:52:48.316Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/df/ec/276c02247c973b02e254c9daac1844ccd38f385850c50e00ad46548eb5db/parallel_web-1.1.0-py3-none-any.whl", hash = "sha256:598aa5613c1146a3880a41592c343b0b9c0f51cff7c1ea6d10bc586d2df5e2f9", size = 167673, upload-time = "2026-06-08T18:22:20.068Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/d3/34b1b3b4259d064c42f4f0b619f6ac78c5e66331252171ed979f52dc2903/parallel_web-1.3.2-py3-none-any.whl", hash = "sha256:990c8ff625a35cdd70b44400112e17e72e454acba008792355f2f5ae22376752", size = 175838, upload-time = "2026-08-27T22:52:47.032Z" },
 ]
 
 [[package]]
