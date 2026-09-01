@@ -185,7 +185,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -351,7 +351,7 @@ wheels = [
 
 [[package]]
 name = "firecrawl-py"
-version = "4.33.1"
+version = "4.40.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -362,9 +362,9 @@ dependencies = [
     { name = "requests" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f5/7e/b3fd63c3704da6d7597a6c654b56b6905cbae371bb0a4bdb1f9c619e98dc/firecrawl_py-4.33.1.tar.gz", hash = "sha256:d94b1ff962b800e2c262f2ece069fdc93301761f3685e65c6bec6479f5aa9d97", size = 203359, upload-time = "2026-07-27T17:12:43.887Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/20/1cf843efc9911f40be240d05c44b364b24d5a1b2be2299293aa5ae14209d/firecrawl_py-4.40.0.tar.gz", hash = "sha256:4b68709871962b8c214e4113e8100633d9d7c66567536a0214402ef8638f3581", size = 231735, upload-time = "2026-08-26T22:56:45.435Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/22/83f32019ec49c6d1f6b68707999b4baeacea6edfe851af3a2bb3f20da56d/firecrawl_py-4.33.1-py3-none-any.whl", hash = "sha256:3f14b6e944cca00718302a006eb54d47f906121d4ccdb5369aaac507d5969389", size = 253769, upload-time = "2026-07-27T17:12:42.246Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/24/8c17af293e69fc56527f0fd760af2d36ca03afb147f9ab2ba6540c12f3cd/firecrawl_py-4.40.0-py3-none-any.whl", hash = "sha256:a2e7816d65aa794fa269bc96fa90680767cbdb139faf227bcd88a1281975fa0e", size = 284451, upload-time = "2026-08-26T22:56:44.111Z" },
 ]
 
 [[package]]
